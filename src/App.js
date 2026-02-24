@@ -351,29 +351,29 @@ function App() {
   // ==================== ФУНКЦИИ АВТОРИЗАЦИИ ====================
 
   const fetchUserData = async (token) => {
-    try {
-      const response = await fetch('https://danett-messenger-server.onrender.com'/api/auth/me`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+  try {
+    const response = await fetch('https://danett-messenger-server.onrender.com/api/auth/me', {
+      headers: { 'Authorization': `Bearer ${token}` }  // ВАЖНО: обратные кавычки и $
+    });
+    
+    if (response.ok) {
+      const user = await response.json();
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+      socket.emit('user-connect', user.email);
+      showNotification(`✅ Добро пожаловать, ${user.username}!`);
       
-      if (response.ok) {
-        const user = await response.json();
-        setCurrentUser(user);
-        setIsAuthenticated(true);
-        socket.emit('user-connect', user.email);
-        showNotification(`✅ Добро пожаловать, ${user.username}!`);
-        
-        setEmailToUsername(prev => ({ ...prev, [user.email]: user.username }));
-        
-        loadContacts(user.email);
-        loadUserGroups(user.email);
-      } else {
-        localStorage.removeItem('token');
-      }
-    } catch (error) {
-      console.error('Ошибка загрузки пользователя:', error);
+      setEmailToUsername(prev => ({ ...prev, [user.email]: user.username }));
+      
+      loadContacts(user.email);
+      loadUserGroups(user.email);
+    } else {
+      localStorage.removeItem('token');
     }
-  };
+  } catch (error) {
+    console.error('Ошибка загрузки пользователя:', error);
+  }
+};
 
   const handleLogin = async (e) => {
     e.preventDefault();
