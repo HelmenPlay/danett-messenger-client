@@ -250,7 +250,8 @@ function App() {
         socket.emit('call-busy', {
           to: data.from,
           from: currentUser.email,
-          fromUsername: currentUser.username
+          fromUsername: currentUser.username,
+          callId: data.callId
         });
         return;
       }
@@ -473,7 +474,13 @@ function App() {
     if (peerRef.current) {
       peerRef.current.destroy();
     }
-    window.location.reload(); // Простой способ сбросить все состояния
+    window.location.reload();
+  };
+
+  const handleUpdateProfile = (updatedUser) => {
+    setCurrentUser(updatedUser);
+    setShowProfile(false);
+    showNotification('✅ Профиль обновлён');
   };
 
   // ==================== ПОДТВЕРЖДЕНИЕ ПОЧТЫ ====================
@@ -494,27 +501,25 @@ function App() {
         setCountdown(data.expiresIn || 60);
         setCanResend(false);
         showNotification('📧 Код отправлен на почту');
+        return true;
       } else {
         showNotification(`❌ ${data.error}`);
+        return false;
       }
     } catch (error) {
       showNotification('❌ Ошибка отправки кода');
+      return false;
     }
   };
 
-  const verifyEmail = async () => {
-    if (!verificationCode || verificationCode.length !== 6) {
-      showNotification('❌ Введите 6-значный код');
-      return;
-    }
-    
+  const verifyEmail = async (email, code) => {
     try {
       const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://danett-messenger-server.onrender.com'}/api/auth/verify-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          email: verificationEmail, 
-          code: verificationCode 
+          email: email || verificationEmail, 
+          code: code || verificationCode 
         })
       });
       
@@ -527,11 +532,14 @@ function App() {
         if (currentUser) {
           setCurrentUser({ ...currentUser, isVerified: true });
         }
+        return true;
       } else {
         showNotification(`❌ ${data.error}`);
+        return false;
       }
     } catch (error) {
       showNotification('❌ Ошибка подтверждения');
+      return false;
     }
   };
 
@@ -760,11 +768,18 @@ function App() {
         trickle: true,
         config: {
           iceServers: [
+            // STUN серверы (для поиска прямого пути)
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
             { urls: 'stun:stun2.l.google.com:19302' },
             { urls: 'stun:stun3.l.google.com:19302' },
-            { urls: 'stun:stun4.l.google.com:19302' }
+            { urls: 'stun:stun4.l.google.com:19302' },
+            // TURN сервер (для ретрансляции, если прямой путь не найден)
+            {
+              urls: 'turn:relay1.expressturn.com:3478',
+              username: 'efEX1N6I7YCD6KOI0M',
+              credential: 'zl9I2aNCWq2KOsG2'
+            }
           ]
         }
       });
@@ -847,11 +862,18 @@ function App() {
         trickle: true,
         config: {
           iceServers: [
+            // STUN серверы (для поиска прямого пути)
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
             { urls: 'stun:stun2.l.google.com:19302' },
             { urls: 'stun:stun3.l.google.com:19302' },
-            { urls: 'stun:stun4.l.google.com:19302' }
+            { urls: 'stun:stun4.l.google.com:19302' },
+            // TURN сервер (для ретрансляции, если прямой путь не найден)
+            {
+              urls: 'turn:relay1.expressturn.com:3478',
+              username: 'efEX1N6I7YCD6KOI0M',
+              credential: 'zl9I2aNCWq2KOsG2'
+            }
           ]
         }
       });
@@ -1030,7 +1052,7 @@ function App() {
 
   const showNotification = (message) => {
     const id = Date.now();
-    setNotifications(prev => [...prev, { id, message }]);
+    setNotifications(prev => [{ id, message }, ...prev].slice(0, 5));
     setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 3000);
   };
 
@@ -1043,12 +1065,6 @@ function App() {
     setSelectedMembers(prev => 
       prev.includes(email) ? prev.filter(m => m !== email) : [...prev, email]
     );
-  };
-
-  const handleUpdateProfile = (updatedUser) => {
-    setCurrentUser(updatedUser);
-    setShowProfile(false);
-    showNotification('✅ Профиль обновлён');
   };
 
   const emojis = ['😊', '😂', '❤️', '👍', '🎉', '🔥', '😢', '😡', '😎', '🤔', '👋', '✅'];
@@ -1243,23 +1259,21 @@ function App() {
 
       {/* Модалка профиля */}
       {showProfile && (
-        {showProfile && (
-  <Profile 
-    user={currentUser} 
-    onClose={() => setShowProfile(false)}
-    onUpdate={handleUpdateProfile}
-    onLogout={handleLogout}
-    onVerifyEmail={async (email, code) => {
-      if (!code) {
-        // Отправка кода
-        await sendVerificationCode(email);
-      } else {
-        // Подтверждение кода
-        await verifyEmail(email, code);
-      }
-    }}
-  />
-)}
+        <Profile 
+          user={currentUser} 
+          onClose={() => setShowProfile(false)}
+          onUpdate={handleUpdateProfile}
+          onLogout={handleLogout}
+          onVerifyEmail={async (email, code) => {
+            if (!code) {
+              return await sendVerificationCode(email);
+            } else {
+              return await verifyEmail(email, code);
+            }
+          }}
+        />
+      )}
+
       {/* Модалка подтверждения */}
       {showVerification && (
         <div className="modal-overlay" onClick={() => setShowVerification(false)}>
