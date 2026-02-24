@@ -1501,7 +1501,7 @@ body.dark-theme {
   overflow: hidden;
 }
 
-.send-button::after {
+.send-button:after {
   content: '';
   position: absolute;
   top: 50%;
@@ -1514,7 +1514,7 @@ body.dark-theme {
   transition: width 0.3s, height 0.3s;
 }
 
-.send-button:active::after {
+.send-button:active:after {
   width: 50px;
   height: 50px;
 }
