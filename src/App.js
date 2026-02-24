@@ -510,25 +510,25 @@ const joinGroupCall = (data) => {
   showNotification('Групповые звонки в разработке', 'info');
 };
 
-const sendMessage = () => {
-  if (!inputMessage.trim() || !currentChat) return;
-  
-  const messageData = {
-    text: inputMessage,
-    to: currentChat._id,
-    from: user._id,
-    fromUsername: user.username
+  const sendMessage = () => {
+    if (!inputMessage.trim() || !currentChat) return;
+    
+    const messageData = {
+      text: inputMessage,
+      to: currentChat._id,
+      from: user._id,
+      fromUsername: user.username
+    };
+    
+    socket.emit('private-message', messageData);
+    
+    setMessages(prev => [...prev, {
+      ...messageData,
+      createdAt: new Date().toISOString()
+    }]);
+    
+    setInputMessage('');
   };
-  
-  socket.emit('private-message', messageData);
-  
-  setMessages(prev => [...prev, {
-    ...messageData,
-    createdAt: new Date().toISOString()
-  }]);
-  
-  setInputMessage('');
-};
 
   // ==================== РЕНДЕР АВТОРИЗАЦИИ ====================
   if (!user) {
@@ -718,7 +718,6 @@ const sendMessage = () => {
                 >
                   + Создать группу
                 </button>
-                {/* Список чатов */}
                 {users.map(u => (
                   <div
                     key={u._id}
@@ -940,8 +939,5 @@ const sendMessage = () => {
     </div>
   );
 }
-  
-  setInputMessage('');
-};
 
 export default App;
