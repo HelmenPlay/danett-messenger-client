@@ -3,7 +3,7 @@ import io from 'socket.io-client';
 import './App.css';
 import Profile from './components/Profile';
 
-const socket = io(process.env.REACT_APP_SOCKET_URL || 'https://danett-messenger-server.onrender.com');
+const socket = io(process.env.REACT_APP_SOCKET_URL || 'glistening-cendol-f83f4a.netlify.app');
 
 function App() {
   // ==================== СОСТОЯНИЯ ====================
