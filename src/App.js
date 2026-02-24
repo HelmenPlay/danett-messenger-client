@@ -873,4 +873,72 @@ function App() {
   );
 }
 
+// ==================== ФУНКЦИИ ДЛЯ ЗВОНКОВ И СООБЩЕНИЙ ====================
+
+const acceptCall = async () => {
+  try {
+    console.log('📞 Принимаем звонок от:', caller?.fromUsername);
+    
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: true
+    });
+    
+    setLocalStream(stream);
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = stream;
+    }
+    
+    const peer = createPeerConnection(caller.from, false);
+    await peer.setRemoteDescription(new RTCSessionDescription(caller.offer));
+    const answer = await peer.createAnswer();
+    await peer.setLocalDescription(answer);
+    
+    socket.emit('accept-call', {
+      to: caller.from,
+      answer,
+      callId
+    });
+    
+    setIsCallIncoming(false);
+  } catch (error) {
+    console.error('Accept call error:', error);
+    showNotification('Не удалось принять звонок', 'error');
+  }
+};
+
+const rejectCall = () => {
+  socket.emit('reject-call', {
+    to: caller.from,
+    callId
+  });
+  setIsCallIncoming(false);
+  setCaller(null);
+};
+
+const joinGroupCall = (data) => {
+  console.log('👥 Присоединяемся к групповому звонку:', data);
+  showNotification('Групповые звонки в разработке', 'info');
+};
+
+const sendMessage = () => {
+  if (!inputMessage.trim() || !currentChat) return;
+  
+  const messageData = {
+    text: inputMessage,
+    to: currentChat._id,
+    from: user._id,
+    fromUsername: user.username
+  };
+  
+  socket.emit('private-message', messageData);
+  
+  setMessages(prev => [...prev, {
+    ...messageData,
+    createdAt: new Date().toISOString()
+  }]);
+  
+  setInputMessage('');
+};
+
 export default App;
