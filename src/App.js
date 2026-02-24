@@ -352,7 +352,7 @@ function App() {
 
   const fetchUserData = async (token) => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://danett-messenger-server.onrender.com'}/api/auth/me`, {
+      const response = await fetch('https://danett-messenger-server.onrender.com'/api/auth/me`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -379,7 +379,7 @@ function App() {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://danett-messenger-server.onrender.com'}/api/auth/login`, {
+      const response = await fetch('https://danett-messenger-server.onrender.com'/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(loginForm)
@@ -426,7 +426,7 @@ function App() {
     
     setLoading(true);
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://danett-messenger-server.onrender.com'}/api/auth/register`, {
+      const response = await fetch('https://danett-messenger-server.onrender.com'/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -487,7 +487,7 @@ function App() {
 
   const sendVerificationCode = async (email) => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://danett-messenger-server.onrender.com'}/api/auth/send-verification`, {
+      const response = await fetch('https://danett-messenger-server.onrender.com'/api/auth/send-verification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
@@ -514,7 +514,7 @@ function App() {
 
   const verifyEmail = async (email, code) => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://danett-messenger-server.onrender.com'}/api/auth/verify-email`, {
+      const response = await fetch('https://danett-messenger-server.onrender.com'/api/auth/verify-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -553,7 +553,7 @@ function App() {
 
   const loadContacts = async (email) => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://danett-messenger-server.onrender.com'}/api/contacts/${encodeURIComponent(email)}`);
+      const response = await fetch('https://danett-messenger-server.onrender.com'/api/contacts/${encodeURIComponent(email)}`);
       const contacts = await response.json();
       
       const contactsObj = {};
@@ -565,7 +565,7 @@ function App() {
       
       contacts.forEach(async (contactEmail) => {
         try {
-          const userResponse = await fetch(`${process.env.REACT_APP_API_URL || 'https://danett-messenger-server.onrender.com'}/api/auth/user-by-email/${encodeURIComponent(contactEmail)}`);
+          const userResponse = await fetch('https://danett-messenger-server.onrender.com'/api/auth/user-by-email/${encodeURIComponent(contactEmail)}`);
           const userData = await userResponse.json();
           if (userData.username) {
             setEmailToUsername(prev => ({ ...prev, [contactEmail]: userData.username }));
@@ -580,7 +580,7 @@ function App() {
 
   const loadUserGroups = async (email) => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://danett-messenger-server.onrender.com'}/api/groups/${encodeURIComponent(email)}`);
+      const response = await fetch('https://danett-messenger-server.onrender.com'/api/groups/${encodeURIComponent(email)}`);
       const data = await response.json();
       setGroups(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -591,7 +591,7 @@ function App() {
 
   const loadMessageHistory = async (contact) => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://danett-messenger-server.onrender.com'}/api/messages/${encodeURIComponent(currentUser.email)}/${encodeURIComponent(contact)}`);
+      const response = await fetch('https://danett-messenger-server.onrender.com'/api/messages/${encodeURIComponent(currentUser.email)}/${encodeURIComponent(contact)}`);
       const messages = await response.json();
       
       const formattedMessages = messages.map(msg => ({
@@ -609,7 +609,7 @@ function App() {
 
   const loadGroupMessages = async (groupId) => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://danett-messenger-server.onrender.com'}/api/group-messages/${groupId}`);
+      const response = await fetch('https://danett-messenger-server.onrender.com'/api/group-messages/${groupId}`);
       const messages = await response.json();
       
       const formattedMessages = messages.map(msg => ({
@@ -687,7 +687,7 @@ function App() {
     if (!newGroupName.trim() || selectedMembers.length === 0 || !currentUser) return;
     
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://danett-messenger-server.onrender.com'}/api/groups`, {
+      const response = await fetch('https://danett-messenger-server.onrender.com'/api/groups`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -715,7 +715,7 @@ function App() {
     if (!window.confirm(`Точно удалить группу "${groupName}"?`) || !currentUser) return;
     
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://danett-messenger-server.onrender.com'}/api/groups/${groupId}?email=${encodeURIComponent(currentUser.email)}`, {
+      const response = await fetch('https://danett-messenger-server.onrender.com'/api/groups/${groupId}?email=${encodeURIComponent(currentUser.email)}`, {
         method: 'DELETE'
       });
       
