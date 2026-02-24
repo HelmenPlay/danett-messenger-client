@@ -76,9 +76,11 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
     if (onVerifyEmail) {
       setIsVerifying(true);
       try {
-        await onVerifyEmail(user?.email);
-        setShowVerificationInput(true);
-        startCountdown(60);
+        const success = await onVerifyEmail(user?.email);
+        if (success) {
+          setShowVerificationInput(true);
+          startCountdown(60);
+        }
       } catch (error) {
         alert('Ошибка отправки кода. Попробуйте позже.');
       } finally {
@@ -90,12 +92,13 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
   const handleCodeSubmit = async () => {
     if (verificationCode.length === 6 && onVerifyEmail) {
       try {
-        await onVerifyEmail(user?.email, verificationCode);
-        setShowVerificationInput(false);
-        setVerificationCode('');
-        alert('Email успешно подтверждён!');
-        // Обновим пользователя
-        onUpdate({ ...user, isVerified: true });
+        const success = await onVerifyEmail(user?.email, verificationCode);
+        if (success) {
+          setShowVerificationInput(false);
+          setVerificationCode('');
+          // Обновим пользователя
+          onUpdate({ ...user, isVerified: true });
+        }
       } catch (error) {
         alert('Неверный код. Попробуйте снова.');
       }
