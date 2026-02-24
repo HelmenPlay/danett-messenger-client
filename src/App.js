@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 import './App.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_URL = 'https://danett-messenger-server.onrender.com';
 const socket = io(API_URL, {
   auth: { token: localStorage.getItem('token') }
 });
