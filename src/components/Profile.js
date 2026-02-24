@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 
-const Profile = ({ user, onClose, onUpdate, onLogout }) => {
+const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedUser, setEditedUser] = useState({
     username: user?.username || '',
@@ -10,11 +10,16 @@ const Profile = ({ user, onClose, onUpdate, onLogout }) => {
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('profile'); // profile, settings, stats
+  const [activeTab, setActiveTab] = useState('profile');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [showVerificationInput, setShowVerificationInput] = useState(false);
+  const [countdown, setCountdown] = useState(0);
   
   const fileInputRef = useRef(null);
+  const countdownInterval = useRef(null);
 
-  // Статистика (можно расширить)
+  // Статистика
   const stats = {
     messagesSent: 127,
     groupsCreated: 3,
@@ -24,7 +29,9 @@ const Profile = ({ user, onClose, onUpdate, onLogout }) => {
   };
 
   const handleAvatarClick = () => {
-    fileInputRef.current?.click();
+    if (isEditing) {
+      fileInputRef.current?.click();
+    }
   };
 
   const handleAvatarChange = (e) => {
@@ -42,8 +49,7 @@ const Profile = ({ user, onClose, onUpdate, onLogout }) => {
   const handleSave = async () => {
     setIsLoading(true);
     
-    // Здесь можно отправить данные на сервер
-    // Пока просто имитируем обновление
+    // Имитация обновления
     setTimeout(() => {
       onUpdate({
         ...user,
@@ -66,6 +72,52 @@ const Profile = ({ user, onClose, onUpdate, onLogout }) => {
     setIsEditing(false);
   };
 
+  const handleVerifyClick = async () => {
+    if (onVerifyEmail) {
+      setIsVerifying(true);
+      try {
+        await onVerifyEmail(user?.email);
+        setShowVerificationInput(true);
+        startCountdown(60);
+      } catch (error) {
+        alert('Ошибка отправки кода. Попробуйте позже.');
+      } finally {
+        setIsVerifying(false);
+      }
+    }
+  };
+
+  const handleCodeSubmit = async () => {
+    if (verificationCode.length === 6 && onVerifyEmail) {
+      try {
+        await onVerifyEmail(user?.email, verificationCode);
+        setShowVerificationInput(false);
+        setVerificationCode('');
+        alert('Email успешно подтверждён!');
+        // Обновим пользователя
+        onUpdate({ ...user, isVerified: true });
+      } catch (error) {
+        alert('Неверный код. Попробуйте снова.');
+      }
+    }
+  };
+
+  const startCountdown = (seconds) => {
+    setCountdown(seconds);
+    if (countdownInterval.current) {
+      clearInterval(countdownInterval.current);
+    }
+    countdownInterval.current = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
   const getInitials = (name) => {
     return name?.charAt(0).toUpperCase() || '?';
   };
@@ -76,9 +128,9 @@ const Profile = ({ user, onClose, onUpdate, onLogout }) => {
         <button className="close-button" onClick={onClose}>✕</button>
         
         <div className="profile-header">
-          <div className="profile-avatar-container" onClick={isEditing ? handleAvatarClick : undefined}>
+          <div className="profile-avatar-container" onClick={handleAvatarClick}>
             {avatarPreview ? (
-              <img src={avatarPreview} alt="Avatar" className="profile-avatar" />
+              <img src={avatarPreview} alt="Avatar" className="profile-avatar-img" />
             ) : (
               <div className="profile-avatar">
                 {getInitials(user?.username)}
@@ -182,6 +234,72 @@ const Profile = ({ user, onClose, onUpdate, onLogout }) => {
                     <span className="info-value">{new Date().toLocaleDateString()}</span>
                   </div>
                 </>
+              )}
+
+              {/* БЛОК ПОДТВЕРЖДЕНИЯ ПОЧТЫ */}
+              {!user?.isVerified && !isEditing && (
+                <div className="verification-section">
+                  {!showVerificationInput ? (
+                    <>
+                      <button 
+                        className="verify-email-button"
+                        onClick={handleVerifyClick}
+                        disabled={isVerifying}
+                      >
+                        {isVerifying ? 'Отправка...' : '✉️ Подтвердить email'}
+                      </button>
+                      <p className="verify-hint">
+                        На вашу почту будет отправлен 6-значный код
+                      </p>
+                    </>
+                  ) : (
+                    <div className="verify-code-section">
+                      <p className="verify-instruction">
+                        Введите код, отправленный на <strong>{user?.email}</strong>
+                      </p>
+                      <input
+                        type="text"
+                        value={verificationCode}
+                        onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="6-значный код"
+                        className="verify-code-input"
+                        maxLength="6"
+                        autoFocus
+                      />
+                      <div className="verify-code-buttons">
+                        <button 
+                          className="verify-submit-button"
+                          onClick={handleCodeSubmit}
+                          disabled={verificationCode.length !== 6}
+                        >
+                          Подтвердить
+                        </button>
+                        <button 
+                          className="verify-cancel-button"
+                          onClick={() => {
+                            setShowVerificationInput(false);
+                            setVerificationCode('');
+                          }}
+                        >
+                          Отмена
+                        </button>
+                      </div>
+                      {countdown > 0 ? (
+                        <p className="verify-countdown">
+                          Отправить повторно через {countdown}с
+                        </p>
+                      ) : (
+                        <button 
+                          className="verify-resend-link"
+                          onClick={handleVerifyClick}
+                          disabled={isVerifying}
+                        >
+                          Отправить код повторно
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -324,6 +442,7 @@ const Profile = ({ user, onClose, onUpdate, onLogout }) => {
           justify-content: center;
           border-radius: var(--radius-full);
           transition: all 0.3s;
+          z-index: 10;
         }
 
         .dark-theme .close-button {
@@ -351,11 +470,15 @@ const Profile = ({ user, onClose, onUpdate, onLogout }) => {
           cursor: ${isEditing ? 'pointer' : 'default'};
         }
 
-        .profile-avatar {
+        .profile-avatar, .profile-avatar-img {
           width: 100%;
           height: 100%;
-          background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary-dark) 100%);
           border-radius: var(--radius-full);
+          object-fit: cover;
+        }
+
+        .profile-avatar {
+          background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary-dark) 100%);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -368,13 +491,6 @@ const Profile = ({ user, onClose, onUpdate, onLogout }) => {
 
         .profile-avatar:hover {
           transform: ${isEditing ? 'scale(1.05)' : 'none'};
-        }
-
-        .profile-avatar img {
-          width: 100%;
-          height: 100%;
-          border-radius: var(--radius-full);
-          object-fit: cover;
         }
 
         .avatar-overlay {
@@ -514,6 +630,170 @@ const Profile = ({ user, onClose, onUpdate, onLogout }) => {
           color: var(--text-secondary-light);
           font-size: 0.75rem;
           margin-top: 0.25rem;
+        }
+
+        /* Стили для подтверждения почты */
+        .verification-section {
+          margin-top: 2rem;
+          padding: 1.5rem;
+          background: rgba(124, 58, 237, 0.1);
+          border-radius: var(--radius-lg);
+          border: 1px solid rgba(124, 58, 237, 0.2);
+        }
+
+        .verify-email-button {
+          width: 100%;
+          padding: 1rem;
+          background: var(--primary);
+          color: white;
+          border: none;
+          border-radius: var(--radius-lg);
+          font-size: 1rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+        }
+
+        .verify-email-button:hover:not(:disabled) {
+          background: var(--primary-dark);
+          transform: translateY(-2px);
+          box-shadow: var(--shadow-md);
+        }
+
+        .verify-email-button:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .verify-hint {
+          text-align: center;
+          font-size: 0.875rem;
+          color: var(--text-secondary-light);
+          margin-top: 0.75rem;
+        }
+
+        .dark-theme .verify-hint {
+          color: var(--text-secondary-dark);
+        }
+
+        .verify-code-section {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+
+        .verify-instruction {
+          text-align: center;
+          font-size: 0.9375rem;
+          color: var(--text-light);
+          line-height: 1.5;
+        }
+
+        .dark-theme .verify-instruction {
+          color: var(--text-dark);
+        }
+
+        .verify-instruction strong {
+          color: var(--primary);
+        }
+
+        .verify-code-input {
+          width: 100%;
+          padding: 1rem;
+          font-size: 1.5rem;
+          text-align: center;
+          letter-spacing: 0.5rem;
+          border: 2px solid var(--primary);
+          border-radius: var(--radius-lg);
+          background: var(--bg-light);
+          color: var(--text-light);
+          font-weight: 600;
+        }
+
+        .dark-theme .verify-code-input {
+          background: var(--bg-dark);
+          color: var(--text-dark);
+        }
+
+        .verify-code-input:focus {
+          outline: none;
+          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.3);
+        }
+
+        .verify-code-buttons {
+          display: flex;
+          gap: 0.75rem;
+        }
+
+        .verify-submit-button,
+        .verify-cancel-button {
+          flex: 1;
+          padding: 0.75rem;
+          border: none;
+          border-radius: var(--radius-lg);
+          font-size: 0.9375rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.3s;
+        }
+
+        .verify-submit-button {
+          background: var(--success);
+          color: white;
+        }
+
+        .verify-submit-button:hover:not(:disabled) {
+          filter: brightness(1.1);
+          transform: translateY(-2px);
+          box-shadow: var(--shadow-md);
+        }
+
+        .verify-submit-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .verify-cancel-button {
+          background: var(--bg-chat-light);
+          color: var(--text-light);
+        }
+
+        .dark-theme .verify-cancel-button {
+          background: var(--bg-dark);
+          color: var(--text-dark);
+        }
+
+        .verify-cancel-button:hover {
+          filter: brightness(0.95);
+        }
+
+        .verify-countdown {
+          text-align: center;
+          color: var(--text-secondary-light);
+          font-size: 0.875rem;
+        }
+
+        .verify-resend-link {
+          background: none;
+          border: none;
+          color: var(--primary);
+          font-size: 0.875rem;
+          text-decoration: underline;
+          cursor: pointer;
+          padding: 0.5rem;
+        }
+
+        .verify-resend-link:hover:not(:disabled) {
+          color: var(--primary-dark);
+        }
+
+        .verify-resend-link:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
 
         .settings-section {
@@ -739,6 +1019,11 @@ const Profile = ({ user, onClose, onUpdate, onLogout }) => {
 
           .stat-value {
             font-size: 1.5rem;
+          }
+
+          .verify-code-input {
+            font-size: 1.25rem;
+            letter-spacing: 0.25rem;
           }
         }
       `}</style>
