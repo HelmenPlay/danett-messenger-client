@@ -7,7 +7,6 @@ const socket = io('https://danett-messenger-server.onrender.com');
 function App() {
   // Состояния для авторизации
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authToken, setAuthToken] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
   const [authMode, setAuthMode] = useState('login');
   
@@ -21,7 +20,6 @@ function App() {
   // Состояния для подтверждения телефона
   const [showPhoneVerification, setShowPhoneVerification] = useState(false);
   const [phoneCode, setPhoneCode] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
   
   // Формы
   const [loginForm, setLoginForm] = useState({ login: '', password: '' });
@@ -82,7 +80,6 @@ function App() {
 
   // ==================== МОНИТОРИНГ ПОТОКОВ ====================
 
-  // Мониторинг локального потока
   useEffect(() => {
     if (localStream) {
       console.log('📹 ЛОКАЛЬНЫЙ ПОТОК ИЗМЕНИЛСЯ:');
@@ -103,7 +100,6 @@ function App() {
     }
   }, [localStream]);
 
-  // Мониторинг удаленного потока
   useEffect(() => {
     if (remoteStream) {
       console.log('📹 УДАЛЕННЫЙ ПОТОК ИЗМЕНИЛСЯ:');
@@ -121,7 +117,6 @@ function App() {
     }
   }, [remoteStream]);
 
-  // Эффект для подключения видео при изменении localStream
   useEffect(() => {
     if (localStream && localVideoRef.current) {
       console.log('📹 useEffect: подключаем локальное видео');
@@ -132,7 +127,6 @@ function App() {
     }
   }, [localStream]);
 
-  // Эффект для подключения видео при изменении remoteStream
   useEffect(() => {
     if (remoteStream && remoteVideoRef.current) {
       console.log('📹 useEffect: подключаем удаленное видео');
@@ -143,29 +137,28 @@ function App() {
     }
   }, [remoteStream]);
 
-  // Проверка наличия видео-элементов
   useEffect(() => {
     console.log('🎥 localVideoRef:', localVideoRef.current);
     console.log('🎥 remoteVideoRef:', remoteVideoRef.current);
   }, [isCallActive]);
 
-  // Очистка уведомлений при размонтировании
   useEffect(() => {
     return () => {
       setNotifications([]);
     };
   }, []);
 
-  // Проверка токена при загрузке
+  // ==================== ПРОВЕРКА ТОКЕНА ====================
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
-      setAuthToken(token);
       fetchUserData(token);
     }
   }, []);
 
-  // Таймер для повторной отправки кода
+  // ==================== ТАЙМЕР ====================
+
   useEffect(() => {
     if (countdown > 0) {
       countdownInterval.current = setTimeout(() => {
@@ -177,7 +170,78 @@ function App() {
     return () => clearTimeout(countdownInterval.current);
   }, [countdown]);
 
+  // ==================== СИНХРОНИЗАЦИЯ ОНЛАЙН-СТАТУСОВ ====================
+
+  useEffect(() => {
+    if (!isAuthenticated || !currentUser) return;
+
+    socket.on('current-users', (users) => {
+      console.log('👥 Текущие онлайн пользователи (полный список):', users);
+      
+      const newOnlineStatus = {};
+      users.forEach(email => {
+        newOnlineStatus[email] = 'online';
+      });
+      
+      setOnlineUsers(prev => {
+        const updated = { ...prev };
+        Object.keys(updated).forEach(email => {
+          if (users.includes(email)) {
+            updated[email] = 'online';
+          } else {
+            updated[email] = 'offline';
+          }
+        });
+        return updated;
+      });
+    });
+
+    socket.on('user-status', ({ userEmail, status }) => {
+      console.log(`👤 Статус пользователя ${userEmail}: ${status}`);
+      setOnlineUsers(prev => ({ ...prev, [userEmail]: status }));
+      
+      if (userEmail !== currentUser.email) {
+        const username = emailToUsername[userEmail] || userEmail;
+        showNotification(`${username} ${status === 'online' ? '🟢 появился в сети' : '🔴 вышел из сети'}`);
+      }
+    });
+
+    return () => {
+      socket.off('current-users');
+      socket.off('user-status');
+    };
+  }, [isAuthenticated, currentUser, emailToUsername]);
+
+  // ==================== ПЕРЕПОДКЛЮЧЕНИЕ СОКЕТА ====================
+
+  useEffect(() => {
+    socket.on('connect', () => {
+      console.log('✅ Сокет подключен');
+      if (currentUser) {
+        socket.emit('user-connect', currentUser.email);
+        showNotification('✅ Соединение восстановлено');
+      }
+    });
+
+    socket.on('disconnect', () => {
+      console.log('❌ Сокет отключен, пробуем переподключиться...');
+      showNotification('❌ Потеряно соединение с сервером');
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('Ошибка подключения сокета:', error);
+      showNotification('❌ Ошибка подключения к серверу');
+    });
+
+    return () => {
+      socket.off('connect');
+      socket.off('disconnect');
+      socket.off('connect_error');
+    };
+  }, [currentUser]);
+
   // ==================== ЗАГРУЗКА ГРУПП ====================
+
   const loadUserGroups = async (email) => {
     try {
       const response = await fetch(`https://danett-messenger-server.onrender.com/api/groups/${encodeURIComponent(email)}`);
@@ -194,7 +258,6 @@ function App() {
     }
   };
 
-  // ==================== ЗАГРУЗКА СООБЩЕНИЙ ГРУППЫ ====================
   const loadGroupMessages = async (groupId) => {
     try {
       const response = await fetch(`https://danett-messenger-server.onrender.com/api/group-messages/${groupId}`);
@@ -214,6 +277,7 @@ function App() {
   };
 
   // ==================== ЗАГРУЗКА ДАННЫХ ПОЛЬЗОВАТЕЛЯ ====================
+
   const fetchUserData = async (token) => {
     try {
       const response = await fetch('https://danett-messenger-server.onrender.com/api/auth/me', {
@@ -310,7 +374,6 @@ function App() {
 
   const sendPhoneCode = async (phone) => {
     showNotification('📱 Демо-режим: код 123456');
-    setPhoneNumber(phone);
     setShowPhoneVerification(true);
     setCountdown(60);
     setCanResend(false);
@@ -346,7 +409,6 @@ function App() {
       
       if (response.ok) {
         localStorage.setItem('token', data.token);
-        setAuthToken(data.token);
         setCurrentUser(data.user);
         setIsAuthenticated(true);
         socket.emit('user-connect', data.user.email);
@@ -397,7 +459,6 @@ function App() {
       
       if (response.ok) {
         localStorage.setItem('token', data.token);
-        setAuthToken(data.token);
         setCurrentUser(data.user);
         setIsAuthenticated(true);
         socket.emit('user-connect', data.user.email);
@@ -438,7 +499,6 @@ function App() {
 
   // ==================== ФУНКЦИИ ДЛЯ ЗВОНКОВ ====================
 
-  // 1. endCall (завершение звонка)
   const endCall = () => {
     if (endCallCalled.current) return;
     endCallCalled.current = true;
@@ -491,7 +551,6 @@ function App() {
     }, 1000);
   };
 
-  // 2. rejectCall (отклонение звонка)
   const rejectCall = () => {
     console.log('❌ ===== ОТКЛОНЕНИЕ ЗВОНКА =====');
     console.log('   Отклоняем звонок от:', callerName);
@@ -506,7 +565,6 @@ function App() {
     setCallerEmail('');
   };
 
-  // 3. startCall (инициация звонка)
   const startCall = async () => {
     if (!recipient || !currentUser) return;
     
@@ -568,7 +626,24 @@ function App() {
             { urls: 'stun:stun1.l.google.com:19302' },
             { urls: 'stun:stun2.l.google.com:19302' },
             { urls: 'stun:stun3.l.google.com:19302' },
-            { urls: 'stun:stun4.l.google.com:19302' }
+            { urls: 'stun:stun4.l.google.com:19302' },
+            { urls: 'stun:stun.iptel.org' },
+            { urls: 'stun:stun.rixtelecom.se' },
+            {
+              urls: 'turn:openrelay.metered.ca:80',
+              username: 'openrelayproject',
+              credential: 'openrelayproject'
+            },
+            {
+              urls: 'turn:openrelay.metered.ca:443',
+              username: 'openrelayproject',
+              credential: 'openrelayproject'
+            },
+            {
+              urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+              username: 'openrelayproject',
+              credential: 'openrelayproject'
+            }
           ]
         }
       });
@@ -578,8 +653,6 @@ function App() {
       
       peer.on('signal', (data) => {
         console.log('📡 Отправка сигнала (offer) получателю:', recipient);
-        console.log('   Размер offer:', JSON.stringify(data).length);
-        
         socket.emit('call-user', {
           to: recipient,
           from: currentUser.email,
@@ -606,8 +679,6 @@ function App() {
           remoteVideoRef.current.play()
             .then(() => {
               console.log('✅ Удаленное видео успешно воспроизводится');
-              console.log('   video readyState:', remoteVideoRef.current.readyState);
-              console.log('   video paused:', remoteVideoRef.current.paused);
             })
             .catch(e => console.error('❌ Ошибка воспроизведения удаленного видео:', e));
         } else {
@@ -649,7 +720,6 @@ function App() {
     }
   };
 
-  // 4. acceptCall (принятие звонка)
   const acceptCall = async () => {
     try {
       console.log('📞 ===== ПРИНЯТИЕ ЗВОНКА =====');
@@ -687,7 +757,27 @@ function App() {
         config: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' }
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' },
+            { urls: 'stun:stun.iptel.org' },
+            { urls: 'stun:stun.rixtelecom.se' },
+            {
+              urls: 'turn:openrelay.metered.ca:80',
+              username: 'openrelayproject',
+              credential: 'openrelayproject'
+            },
+            {
+              urls: 'turn:openrelay.metered.ca:443',
+              username: 'openrelayproject',
+              credential: 'openrelayproject'
+            },
+            {
+              urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+              username: 'openrelayproject',
+              credential: 'openrelayproject'
+            }
           ]
         }
       });
@@ -698,8 +788,6 @@ function App() {
       peer.on('signal', (data) => {
         console.log('📡 ===== ОТПРАВКА ANSWER =====');
         console.log('   Кому:', callerEmail);
-        console.log('   Размер данных:', JSON.stringify(data).length);
-        
         socket.emit('accept-call', {
           to: callerEmail,
           from: currentUser.email,
@@ -748,7 +836,6 @@ function App() {
     }
   };
 
-  // 5. toggleAudio (включение/выключение микрофона)
   const toggleAudio = () => {
     if (localStream) {
       const audioTrack = localStream.getAudioTracks()[0];
@@ -760,7 +847,6 @@ function App() {
     }
   };
 
-  // 6. toggleVideo (включение/выключение камеры)
   const toggleVideo = () => {
     if (localStream) {
       const videoTrack = localStream.getVideoTracks()[0];
@@ -821,29 +907,6 @@ function App() {
     }
   };
   
-  // Синхронизация статусов
-  useEffect(() => {
-    if (!isAuthenticated || !currentUser) return;
-    
-    socket.on('user-status', ({ userEmail, status }) => {
-      console.log('👤 Статус пользователя:', userEmail, status);
-      setOnlineUsers(prev => ({ ...prev, [userEmail]: status }));
-      
-      if (userEmail === currentUser.email) return;
-      
-      const username = emailToUsername[userEmail] || userEmail;
-      if (status === 'online') {
-        showNotification(`${username} появился в сети 🟢`);
-      } else {
-        showNotification(`${username} вышел из сети 🔴`);
-      }
-    });
-    
-    return () => {
-      socket.off('user-status');
-    };
-  }, [isAuthenticated, currentUser, emailToUsername]);
-
   // ==================== ГРУППЫ ====================
 
   const createGroup = async () => {
@@ -898,6 +961,10 @@ function App() {
   // ==================== СООБЩЕНИЯ ====================
 
   const sendMessage = () => {
+    if (!socket.connected) {
+      showNotification('❌ Нет соединения с сервером');
+      return;
+    }
     if (message.trim() && recipient && currentUser) {
       socket.emit('private-message', {
         to: recipient,
@@ -948,6 +1015,7 @@ function App() {
   }, [messages, groupMessages]);
   
   // ==================== ОБРАБОТКА WEBRTC СИГНАЛОВ ====================
+
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -977,7 +1045,6 @@ function App() {
       console.log('✅ ===== ЗВОНОК ПРИНЯТ =====');
       console.log('   От (кто принял):', data.from);
       console.log('   Имя:', data.fromUsername);
-      console.log('   Есть answer:', !!data.answer);
       
       if (peerRef.current) {
         console.log('📡 Отправляем answer в peer');
@@ -1329,7 +1396,6 @@ function App() {
       {/* Панель видеозвонка */}
       {isCallActive && (
         <>
-          {/* Свёрнутый режим */}
           {isCallMinimized ? (
             <div
               onClick={() => setIsCallMinimized(false)}
@@ -1385,7 +1451,6 @@ function App() {
               </div>
             </div>
           ) : (
-            /* Развёрнутый режим */
             <div style={{
               position: 'fixed',
               top: '50%',
@@ -1402,7 +1467,6 @@ function App() {
               display: 'flex',
               flexDirection: 'column'
             }}>
-              {/* Шапка звонка */}
               <div style={{
                 padding: '15px 20px',
                 background: '#2d2d2d',
@@ -1431,7 +1495,6 @@ function App() {
                 </button>
               </div>
 
-              {/* Основная область видео */}
               <div style={{
                 flex: 1,
                 display: 'flex',
@@ -1440,7 +1503,6 @@ function App() {
                 background: '#1a1a1a',
                 position: 'relative'
               }}>
-                {/* Видео собеседника */}
                 <video
                   ref={remoteVideoRef}
                   autoPlay
@@ -1455,7 +1517,6 @@ function App() {
                   }}
                 />
                 
-                {/* Своё видео */}
                 <video
                   ref={localVideoRef}
                   autoPlay
@@ -1476,7 +1537,6 @@ function App() {
                 />
               </div>
 
-              {/* Панель управления */}
               <div style={{
                 padding: '20px',
                 background: '#2d2d2d',
@@ -1486,60 +1546,39 @@ function App() {
                 gap: '15px',
                 flexWrap: 'wrap'
               }}>
-                <button
-                  onClick={toggleAudio}
-                  style={{
-                    padding: '12px 25px',
-                    background: isAudioMuted ? '#ff4444' : '#4CAF50',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '50px',
-                    cursor: 'pointer',
-                    fontSize: '16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    transition: 'all 0.3s'
-                  }}
-                >
+                <button onClick={toggleAudio} style={{
+                  padding: '12px 25px',
+                  background: isAudioMuted ? '#ff4444' : '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '50px',
+                  cursor: 'pointer',
+                  fontSize: '16px'
+                }}>
                   {isAudioMuted ? '🔇 Микрофон выкл' : '🎤 Микрофон вкл'}
                 </button>
                 
-                <button
-                  onClick={toggleVideo}
-                  style={{
-                    padding: '12px 25px',
-                    background: isVideoOff ? '#ff4444' : '#4CAF50',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '50px',
-                    cursor: 'pointer',
-                    fontSize: '16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    transition: 'all 0.3s'
-                  }}
-                >
+                <button onClick={toggleVideo} style={{
+                  padding: '12px 25px',
+                  background: isVideoOff ? '#ff4444' : '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '50px',
+                  cursor: 'pointer',
+                  fontSize: '16px'
+                }}>
                   {isVideoOff ? '📹 Камера выкл' : '📹 Камера вкл'}
                 </button>
                 
-                <button
-                  onClick={endCall}
-                  style={{
-                    padding: '12px 35px',
-                    background: '#ff4444',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '50px',
-                    cursor: 'pointer',
-                    fontSize: '16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    transition: 'all 0.3s'
-                  }}
-                >
+                <button onClick={endCall} style={{
+                  padding: '12px 35px',
+                  background: '#ff4444',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '50px',
+                  cursor: 'pointer',
+                  fontSize: '16px'
+                }}>
                   📴 Завершить звонок
                 </button>
               </div>
