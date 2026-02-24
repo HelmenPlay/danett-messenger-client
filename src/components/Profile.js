@@ -3,31 +3,41 @@ import React, { useState, useRef } from 'react';
 const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedUser, setEditedUser] = useState({
+    name: user?.name || '',
     username: user?.username || '',
-    phone: user?.phone || '',
-    email: user?.email || ''
+    bio: user?.bio || '',
+    phone: user?.phone || ''
   });
+  const [avatarPreview, setAvatarPreview] = useState(user?.avatar || null);
   const [avatarFile, setAvatarFile] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationCode, setVerificationCode] = useState('');
-  const [showVerificationInput, setShowVerificationInput] = useState(false);
-  const [countdown, setCountdown] = useState(0);
+  const [privacy, setPrivacy] = useState(user?.privacy || {
+    showLastSeen: true,
+    showOnline: true,
+    allowCalls: true,
+    allowGroups: true
+  });
+  const [notifications, setNotifications] = useState({
+    messages: true,
+    groups: true,
+    calls: true,
+    sound: true
+  });
+  const [isLoading, setIsLoading] = useState(false);
   
   const fileInputRef = useRef(null);
-  const countdownInterval = useRef(null);
 
-  // Статистика
+  // ==================== СТАТИСТИКА ====================
   const stats = {
-    messagesSent: 127,
+    messagesSent: 128,
     groupsCreated: 3,
     callsMade: 15,
+    contactsCount: 24,
     accountAge: '2 месяца',
-    lastActive: new Date().toLocaleDateString()
+    lastActive: new Date().toLocaleDateString('ru-RU')
   };
 
+  // ==================== АВАТАР ====================
   const handleAvatarClick = () => {
     if (isEditing) {
       fileInputRef.current?.click();
@@ -46,15 +56,17 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
     }
   };
 
+  // ==================== СОХРАНЕНИЕ ====================
   const handleSave = async () => {
     setIsLoading(true);
     
-    // Имитация обновления
+    // Имитация сохранения
     setTimeout(() => {
       onUpdate({
         ...user,
         ...editedUser,
-        avatar: avatarPreview || user?.avatar
+        avatar: avatarPreview,
+        privacy
       });
       setIsEditing(false);
       setIsLoading(false);
@@ -63,88 +75,61 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
 
   const handleCancel = () => {
     setEditedUser({
+      name: user?.name || '',
       username: user?.username || '',
-      phone: user?.phone || '',
-      email: user?.email || ''
+      bio: user?.bio || '',
+      phone: user?.phone || ''
     });
-    setAvatarPreview(null);
+    setAvatarPreview(user?.avatar || null);
     setAvatarFile(null);
     setIsEditing(false);
   };
 
-  const handleVerifyClick = async () => {
+  // ==================== ПОДТВЕРЖДЕНИЕ ПОЧТЫ ====================
+  const handleVerifyClick = () => {
     if (onVerifyEmail) {
-      setIsVerifying(true);
-      try {
-        const success = await onVerifyEmail(user?.email);
-        if (success) {
-          setShowVerificationInput(true);
-          startCountdown(60);
-        }
-      } catch (error) {
-        alert('Ошибка отправки кода. Попробуйте позже.');
-      } finally {
-        setIsVerifying(false);
-      }
+      onVerifyEmail();
     }
   };
 
-  const handleCodeSubmit = async () => {
-    if (verificationCode.length === 6 && onVerifyEmail) {
-      try {
-        const success = await onVerifyEmail(user?.email, verificationCode);
-        if (success) {
-          setShowVerificationInput(false);
-          setVerificationCode('');
-          // Обновим пользователя
-          onUpdate({ ...user, isVerified: true });
-        }
-      } catch (error) {
-        alert('Неверный код. Попробуйте снова.');
-      }
-    }
-  };
-
-  const startCountdown = (seconds) => {
-    setCountdown(seconds);
-    if (countdownInterval.current) {
-      clearInterval(countdownInterval.current);
-    }
-    countdownInterval.current = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(countdownInterval.current);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
+  // ==================== ВСПОМОГАТЕЛЬНЫЕ ====================
   const getInitials = (name) => {
     return name?.charAt(0).toUpperCase() || '?';
   };
 
+  const formatDate = (date) => {
+    return new Date(date).toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+  };
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="profile-overlay" onClick={onClose}>
       <div className="profile-modal" onClick={e => e.stopPropagation()}>
-        <button className="close-button" onClick={onClose}>✕</button>
+        <button className="profile-close" onClick={onClose}>✕</button>
         
+        {/* Шапка профиля */}
         <div className="profile-header">
-          <div className="profile-avatar-container" onClick={handleAvatarClick}>
+          <div 
+            className={`profile-avatar-container ${isEditing ? 'editable' : ''}`}
+            onClick={handleAvatarClick}
+          >
             {avatarPreview ? (
               <img src={avatarPreview} alt="Avatar" className="profile-avatar-img" />
             ) : (
               <div className="profile-avatar">
-                {getInitials(user?.username)}
+                {getInitials(user?.name)}
               </div>
             )}
             {isEditing && (
-              <div className="avatar-overlay">
+              <div className="avatar-edit-overlay">
                 <span>📷</span>
               </div>
             )}
           </div>
+          
           <input
             type="file"
             ref={fileInputRef}
@@ -153,26 +138,40 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
             style={{ display: 'none' }}
           />
           
-          <h2 className="profile-name">{user?.username}</h2>
-          <div className="profile-badge">
-            {user?.isVerified ? '✅ Подтверждён' : '⏳ Не подтверждён'}
-          </div>
+          <h2 className="profile-name">{user?.name}</h2>
+          <div className="profile-username">{user?.username}</div>
+          
+          {!user?.isVerified && (
+            <button 
+              className="verify-email-button"
+              onClick={handleVerifyClick}
+            >
+              ✉️ Подтвердить email
+            </button>
+          )}
         </div>
 
+        {/* Табы */}
         <div className="profile-tabs">
-          <button 
+          <button
             className={`profile-tab ${activeTab === 'profile' ? 'active' : ''}`}
             onClick={() => setActiveTab('profile')}
           >
             👤 Профиль
           </button>
-          <button 
-            className={`profile-tab ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('settings')}
+          <button
+            className={`profile-tab ${activeTab === 'privacy' ? 'active' : ''}`}
+            onClick={() => setActiveTab('privacy')}
           >
-            ⚙️ Настройки
+            🔒 Приватность
           </button>
-          <button 
+          <button
+            className={`profile-tab ${activeTab === 'notifications' ? 'active' : ''}`}
+            onClick={() => setActiveTab('notifications')}
+          >
+            🔔 Уведомления
+          </button>
+          <button
             className={`profile-tab ${activeTab === 'stats' ? 'active' : ''}`}
             onClick={() => setActiveTab('stats')}
           >
@@ -180,21 +179,46 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
           </button>
         </div>
 
+        {/* Контент */}
         <div className="profile-content">
+          {/* Вкладка Профиль */}
           {activeTab === 'profile' && (
             <div className="profile-info">
               {isEditing ? (
                 <>
                   <div className="info-row">
-                    <label>Имя пользователя</label>
+                    <label>Имя</label>
+                    <input
+                      type="text"
+                      value={editedUser.name}
+                      onChange={(e) => setEditedUser({...editedUser, name: e.target.value})}
+                      className="profile-input"
+                      placeholder="Ваше имя"
+                    />
+                  </div>
+                  
+                  <div className="info-row">
+                    <label>Username</label>
                     <input
                       type="text"
                       value={editedUser.username}
                       onChange={(e) => setEditedUser({...editedUser, username: e.target.value})}
                       className="profile-input"
-                      placeholder="Введите имя"
+                      placeholder="@username"
                     />
                   </div>
+                  
+                  <div className="info-row">
+                    <label>О себе</label>
+                    <textarea
+                      value={editedUser.bio}
+                      onChange={(e) => setEditedUser({...editedUser, bio: e.target.value})}
+                      className="profile-textarea"
+                      placeholder="Расскажите о себе"
+                      rows="3"
+                    />
+                  </div>
+                  
                   <div className="info-row">
                     <label>Телефон</label>
                     <input
@@ -202,149 +226,164 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
                       value={editedUser.phone}
                       onChange={(e) => setEditedUser({...editedUser, phone: e.target.value})}
                       className="profile-input"
-                      placeholder="Введите телефон"
+                      placeholder="+7 (999) 999-99-99"
                     />
-                  </div>
-                  <div className="info-row">
-                    <label>Email</label>
-                    <input
-                      type="email"
-                      value={editedUser.email}
-                      onChange={(e) => setEditedUser({...editedUser, email: e.target.value})}
-                      className="profile-input"
-                      placeholder="Введите email"
-                      disabled
-                    />
-                    <small>Email нельзя изменить</small>
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="info-row">
+                  <div className="info-item">
                     <span className="info-label">📧 Email</span>
                     <span className="info-value">{user?.email}</span>
+                    {!user?.isVerified && (
+                      <span className="unverified-badge">Не подтверждён</span>
+                    )}
                   </div>
-                  <div className="info-row">
-                    <span className="info-label">📱 Телефон</span>
-                    <span className="info-value">{user?.phone || 'Не указан'}</span>
+                  
+                  {user?.bio && (
+                    <div className="info-item bio">
+                      <span className="info-label">📝 О себе</span>
+                      <span className="info-value">{user.bio}</span>
+                    </div>
+                  )}
+                  
+                  {user?.phone && (
+                    <div className="info-item">
+                      <span className="info-label">📱 Телефон</span>
+                      <span className="info-value">{user.phone}</span>
+                    </div>
+                  )}
+                  
+                  <div className="info-item">
+                    <span className="info-label">📅 Дата регистрации</span>
+                    <span className="info-value">{formatDate(user?.createdAt)}</span>
                   </div>
-                  <div className="info-row">
+                  
+                  <div className="info-item">
                     <span className="info-label">🆔 ID</span>
-                    <span className="info-value">{user?.id || '—'}</span>
-                  </div>
-                  <div className="info-row">
-                    <span className="info-label">📅 Регистрация</span>
-                    <span className="info-value">{new Date().toLocaleDateString()}</span>
+                    <span className="info-value id">{user?.id}</span>
                   </div>
                 </>
               )}
-
-              {/* БЛОК ПОДТВЕРЖДЕНИЯ ПОЧТЫ */}
-              {!user?.isVerified && !isEditing && (
-                <div className="verification-section">
-                  {!showVerificationInput ? (
-                    <>
-                      <button 
-                        className="verify-email-button"
-                        onClick={handleVerifyClick}
-                        disabled={isVerifying}
-                      >
-                        {isVerifying ? 'Отправка...' : '✉️ Подтвердить email'}
-                      </button>
-                      <p className="verify-hint">
-                        На вашу почту будет отправлен 6-значный код
-                      </p>
-                    </>
-                  ) : (
-                    <div className="verify-code-section">
-                      <p className="verify-instruction">
-                        Введите код, отправленный на <strong>{user?.email}</strong>
-                      </p>
-                      <input
-                        type="text"
-                        value={verificationCode}
-                        onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        placeholder="6-значный код"
-                        className="verify-code-input"
-                        maxLength="6"
-                        autoFocus
-                      />
-                      <div className="verify-code-buttons">
-                        <button 
-                          className="verify-submit-button"
-                          onClick={handleCodeSubmit}
-                          disabled={verificationCode.length !== 6}
-                        >
-                          Подтвердить
-                        </button>
-                        <button 
-                          className="verify-cancel-button"
-                          onClick={() => {
-                            setShowVerificationInput(false);
-                            setVerificationCode('');
-                          }}
-                        >
-                          Отмена
-                        </button>
-                      </div>
-                      {countdown > 0 ? (
-                        <p className="verify-countdown">
-                          Отправить повторно через {countdown}с
-                        </p>
-                      ) : (
-                        <button 
-                          className="verify-resend-link"
-                          onClick={handleVerifyClick}
-                          disabled={isVerifying}
-                        >
-                          Отправить код повторно
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           )}
 
-          {activeTab === 'settings' && (
-            <div className="profile-settings">
+          {/* Вкладка Приватность */}
+          {activeTab === 'privacy' && (
+            <div className="privacy-settings">
               <div className="settings-section">
-                <h3>Уведомления</h3>
+                <h3>Кто может видеть</h3>
+                
                 <label className="setting-item">
-                  <input type="checkbox" defaultChecked /> 
-                  <span>Звук сообщений</span>
+                  <input
+                    type="checkbox"
+                    checked={privacy.showLastSeen}
+                    onChange={(e) => setPrivacy({...privacy, showLastSeen: e.target.checked})}
+                    disabled={!isEditing}
+                  />
+                  <span>Время последнего посещения</span>
                 </label>
+                
                 <label className="setting-item">
-                  <input type="checkbox" defaultChecked /> 
-                  <span>Звук звонков</span>
+                  <input
+                    type="checkbox"
+                    checked={privacy.showOnline}
+                    onChange={(e) => setPrivacy({...privacy, showOnline: e.target.checked})}
+                    disabled={!isEditing}
+                  />
+                  <span>Статус «онлайн»</span>
                 </label>
+                
                 <label className="setting-item">
-                  <input type="checkbox" defaultChecked /> 
-                  <span>Уведомления на рабочем столе</span>
+                  <input
+                    type="checkbox"
+                    checked={privacy.allowCalls}
+                    onChange={(e) => setPrivacy({...privacy, allowCalls: e.target.checked})}
+                    disabled={!isEditing}
+                  />
+                  <span>Разрешить звонки от всех</span>
+                </label>
+                
+                <label className="setting-item">
+                  <input
+                    type="checkbox"
+                    checked={privacy.allowGroups}
+                    onChange={(e) => setPrivacy({...privacy, allowGroups: e.target.checked})}
+                    disabled={!isEditing}
+                  />
+                  <span>Разрешать добавлять в группы</span>
                 </label>
               </div>
-
+              
               <div className="settings-section">
-                <h3>Конфиденциальность</h3>
-                <label className="setting-item">
-                  <input type="checkbox" defaultChecked /> 
-                  <span>Показывать статус "онлайн"</span>
-                </label>
-                <label className="setting-item">
-                  <input type="checkbox" defaultChecked /> 
-                  <span>Читать подтверждения</span>
-                </label>
+                <h3>Заблокированные</h3>
+                <p className="empty-blocked">Нет заблокированных пользователей</p>
               </div>
-
-              <div className="settings-section">
-                <h3>Данные</h3>
-                <button className="danger-button">🗑️ Очистить историю</button>
-                <button className="danger-button">📤 Экспортировать данные</button>
+              
+              <div className="danger-zone">
+                <h3>Опасная зона</h3>
+                <button className="danger-button">🚫 Заблокировать пользователя</button>
+                <button className="danger-button">🗑️ Удалить аккаунт</button>
               </div>
             </div>
           )}
 
+          {/* Вкладка Уведомления */}
+          {activeTab === 'notifications' && (
+            <div className="notification-settings">
+              <div className="settings-section">
+                <h3>Типы уведомлений</h3>
+                
+                <label className="setting-item">
+                  <input
+                    type="checkbox"
+                    checked={notifications.messages}
+                    onChange={(e) => setNotifications({...notifications, messages: e.target.checked})}
+                  />
+                  <span>Личные сообщения</span>
+                </label>
+                
+                <label className="setting-item">
+                  <input
+                    type="checkbox"
+                    checked={notifications.groups}
+                    onChange={(e) => setNotifications({...notifications, groups: e.target.checked})}
+                  />
+                  <span>Групповые чаты</span>
+                </label>
+                
+                <label className="setting-item">
+                  <input
+                    type="checkbox"
+                    checked={notifications.calls}
+                    onChange={(e) => setNotifications({...notifications, calls: e.target.checked})}
+                  />
+                  <span>Звонки</span>
+                </label>
+              </div>
+              
+              <div className="settings-section">
+                <h3>Звук</h3>
+                
+                <label className="setting-item">
+                  <input
+                    type="checkbox"
+                    checked={notifications.sound}
+                    onChange={(e) => setNotifications({...notifications, sound: e.target.checked})}
+                  />
+                  <span>Звуковые уведомления</span>
+                </label>
+              </div>
+              
+              <div className="settings-section">
+                <h3>Дополнительно</h3>
+                <button className="secondary-button">🔔 Настроить исключения</button>
+                <button className="secondary-button">⏰ Режим «Не беспокоить»</button>
+              </div>
+            </div>
+          )}
+
+          {/* Вкладка Статистика */}
           {activeTab === 'stats' && (
             <div className="profile-stats">
               <div className="stats-grid">
@@ -352,39 +391,61 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
                   <div className="stat-value">{stats.messagesSent}</div>
                   <div className="stat-label">Сообщений</div>
                 </div>
+                
                 <div className="stat-card">
                   <div className="stat-value">{stats.groupsCreated}</div>
-                  <div className="stat-label">Групп</div>
+                  <div className="stat-label">Групп создано</div>
                 </div>
+                
                 <div className="stat-card">
                   <div className="stat-value">{stats.callsMade}</div>
                   <div className="stat-label">Звонков</div>
                 </div>
+                
                 <div className="stat-card">
-                  <div className="stat-value">{stats.accountAge}</div>
-                  <div className="stat-label">В системе</div>
+                  <div className="stat-value">{stats.contactsCount}</div>
+                  <div className="stat-label">Контактов</div>
                 </div>
               </div>
               
-              <div className="last-active">
-                Последняя активность: {stats.lastActive}
+              <div className="stats-details">
+                <div className="stat-row">
+                  <span>В системе:</span>
+                  <strong>{stats.accountAge}</strong>
+                </div>
+                
+                <div className="stat-row">
+                  <span>Последняя активность:</span>
+                  <strong>{stats.lastActive}</strong>
+                </div>
+                
+                <div className="stat-row">
+                  <span>Средняя длина сообщения:</span>
+                  <strong>42 символа</strong>
+                </div>
+                
+                <div className="stat-row">
+                  <span>Любимый стикер:</span>
+                  <strong>😊</strong>
+                </div>
               </div>
             </div>
           )}
         </div>
 
+        {/* Футер с кнопками */}
         <div className="profile-footer">
           {isEditing ? (
             <>
               <button 
-                className="profile-button cancel" 
+                className="profile-button cancel"
                 onClick={handleCancel}
                 disabled={isLoading}
               >
                 Отмена
               </button>
               <button 
-                className="profile-button save" 
+                className="profile-button save"
                 onClick={handleSave}
                 disabled={isLoading}
               >
@@ -394,13 +455,13 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
           ) : (
             <>
               <button 
-                className="profile-button edit" 
+                className="profile-button edit"
                 onClick={() => setIsEditing(true)}
               >
                 ✏️ Редактировать
               </button>
               <button 
-                className="profile-button logout" 
+                className="profile-button logout"
                 onClick={onLogout}
               >
                 🚪 Выйти
@@ -410,26 +471,58 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
         </div>
       </div>
 
+      {/* Стили компонента */}
       <style jsx>{`
+        .profile-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(5px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
         .profile-modal {
           background: var(--bg-light);
           border-radius: var(--radius-2xl);
           width: 90%;
-          max-width: 500px;
+          max-width: 600px;
           max-height: 90vh;
           overflow-y: auto;
           position: relative;
           padding: 2rem;
           box-shadow: var(--shadow-xl);
-          animation: scaleIn 0.3s ease;
+          animation: slideUp 0.3s ease;
         }
 
-        .dark-theme .profile-modal {
+        .dark .profile-modal {
           background: var(--bg-sidebar-dark);
           color: var(--text-dark);
         }
 
-        .close-button {
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .profile-close {
           position: absolute;
           top: 1rem;
           right: 1rem;
@@ -448,15 +541,15 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
           z-index: 10;
         }
 
-        .dark-theme .close-button {
+        .dark .profile-close {
           color: var(--text-secondary-dark);
         }
 
-        .close-button:hover {
+        .profile-close:hover {
           background: var(--bg-chat-light);
         }
 
-        .dark-theme .close-button:hover {
+        .dark .profile-close:hover {
           background: var(--bg-dark);
         }
 
@@ -470,7 +563,11 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
           height: 120px;
           margin: 0 auto 1rem;
           position: relative;
-          cursor: ${isEditing ? 'pointer' : 'default'};
+          cursor: default;
+        }
+
+        .profile-avatar-container.editable {
+          cursor: pointer;
         }
 
         .profile-avatar, .profile-avatar-img {
@@ -481,7 +578,7 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
         }
 
         .profile-avatar {
-          background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary-dark) 100%);
+          background: linear-gradient(135deg, var(--primary-light), var(--primary-dark));
           display: flex;
           align-items: center;
           justify-content: center;
@@ -489,14 +586,14 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
           font-size: 3rem;
           font-weight: bold;
           border: 4px solid var(--primary);
-          transition: all 0.3s;
+          transition: transform 0.3s;
         }
 
-        .profile-avatar:hover {
-          transform: ${isEditing ? 'scale(1.05)' : 'none'};
+        .profile-avatar-container.editable:hover .profile-avatar {
+          transform: scale(1.05);
         }
 
-        .avatar-overlay {
+        .avatar-edit-overlay {
           position: absolute;
           top: 0;
           left: 0;
@@ -513,39 +610,57 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
           transition: opacity 0.3s;
         }
 
-        .profile-avatar-container:hover .avatar-overlay {
+        .profile-avatar-container.editable:hover .avatar-edit-overlay {
           opacity: 1;
         }
 
         .profile-name {
           font-size: 1.5rem;
-          margin-bottom: 0.5rem;
+          margin-bottom: 0.25rem;
           color: var(--text-light);
         }
 
-        .dark-theme .profile-name {
+        .dark .profile-name {
           color: var(--text-dark);
         }
 
-        .profile-badge {
-          font-size: 0.875rem;
+        .profile-username {
+          font-size: 1rem;
           color: var(--text-secondary-light);
+          margin-bottom: 1rem;
         }
 
-        .dark-theme .profile-badge {
+        .dark .profile-username {
           color: var(--text-secondary-dark);
+        }
+
+        .verify-email-button {
+          background: var(--warning);
+          color: white;
+          border: none;
+          padding: 0.5rem 1rem;
+          border-radius: var(--radius-full);
+          font-size: 0.875rem;
+          cursor: pointer;
+          transition: all 0.3s;
+        }
+
+        .verify-email-button:hover {
+          transform: translateY(-2px);
+          box-shadow: var(--shadow-md);
+          filter: brightness(1.1);
         }
 
         .profile-tabs {
           display: flex;
-          gap: 0.5rem;
+          gap: 0.25rem;
           margin-bottom: 2rem;
           background: var(--bg-chat-light);
           padding: 0.25rem;
           border-radius: var(--radius-full);
         }
 
-        .dark-theme .profile-tabs {
+        .dark .profile-tabs {
           background: var(--bg-dark);
         }
 
@@ -556,13 +671,12 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
           background: none;
           border-radius: var(--radius-full);
           font-size: 0.875rem;
-          font-weight: 500;
           cursor: pointer;
           transition: all 0.3s;
           color: var(--text-secondary-light);
         }
 
-        .dark-theme .profile-tab {
+        .dark .profile-tab {
           color: var(--text-secondary-dark);
         }
 
@@ -572,40 +686,63 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
         }
 
         .profile-content {
-          min-height: 200px;
+          min-height: 300px;
           margin-bottom: 2rem;
         }
 
-        .info-row {
+        .info-item {
           display: flex;
-          justify-content: space-between;
+          align-items: center;
           padding: 1rem 0;
           border-bottom: 1px solid var(--border-light);
         }
 
-        .dark-theme .info-row {
+        .dark .info-item {
           border-bottom-color: var(--border-dark);
         }
 
+        .info-item.bio {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 0.5rem;
+        }
+
         .info-label {
+          width: 120px;
           color: var(--text-secondary-light);
           font-weight: 500;
         }
 
-        .dark-theme .info-label {
+        .dark .info-label {
           color: var(--text-secondary-dark);
         }
 
         .info-value {
+          flex: 1;
           color: var(--text-light);
           font-weight: 600;
         }
 
-        .dark-theme .info-value {
+        .dark .info-value {
           color: var(--text-dark);
         }
 
-        .profile-input {
+        .info-value.id {
+          font-family: monospace;
+          font-size: 0.875rem;
+          opacity: 0.7;
+        }
+
+        .unverified-badge {
+          background: var(--warning);
+          color: white;
+          padding: 0.25rem 0.5rem;
+          border-radius: var(--radius-full);
+          font-size: 0.75rem;
+          margin-left: 1rem;
+        }
+
+        .profile-input, .profile-textarea {
           width: 100%;
           padding: 0.75rem;
           border: 1px solid var(--border-light);
@@ -616,187 +753,21 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
           color: var(--text-light);
         }
 
-        .dark-theme .profile-input {
+        .dark .profile-input, .dark .profile-textarea {
           background: var(--bg-dark);
           border-color: var(--border-dark);
           color: var(--text-dark);
         }
 
-        .profile-input:focus {
+        .profile-input:focus, .profile-textarea:focus {
           outline: none;
           border-color: var(--primary);
           box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
         }
 
-        small {
-          display: block;
-          color: var(--text-secondary-light);
-          font-size: 0.75rem;
-          margin-top: 0.25rem;
-        }
-
-        /* Стили для подтверждения почты */
-        .verification-section {
-          margin-top: 2rem;
-          padding: 1.5rem;
-          background: rgba(124, 58, 237, 0.1);
-          border-radius: var(--radius-lg);
-          border: 1px solid rgba(124, 58, 237, 0.2);
-        }
-
-        .verify-email-button {
-          width: 100%;
-          padding: 1rem;
-          background: var(--primary);
-          color: white;
-          border: none;
-          border-radius: var(--radius-lg);
-          font-size: 1rem;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.3s;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.5rem;
-        }
-
-        .verify-email-button:hover:not(:disabled) {
-          background: var(--primary-dark);
-          transform: translateY(-2px);
-          box-shadow: var(--shadow-md);
-        }
-
-        .verify-email-button:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .verify-hint {
-          text-align: center;
-          font-size: 0.875rem;
-          color: var(--text-secondary-light);
-          margin-top: 0.75rem;
-        }
-
-        .dark-theme .verify-hint {
-          color: var(--text-secondary-dark);
-        }
-
-        .verify-code-section {
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-
-        .verify-instruction {
-          text-align: center;
-          font-size: 0.9375rem;
-          color: var(--text-light);
-          line-height: 1.5;
-        }
-
-        .dark-theme .verify-instruction {
-          color: var(--text-dark);
-        }
-
-        .verify-instruction strong {
-          color: var(--primary);
-        }
-
-        .verify-code-input {
-          width: 100%;
-          padding: 1rem;
-          font-size: 1.5rem;
-          text-align: center;
-          letter-spacing: 0.5rem;
-          border: 2px solid var(--primary);
-          border-radius: var(--radius-lg);
-          background: var(--bg-light);
-          color: var(--text-light);
-          font-weight: 600;
-        }
-
-        .dark-theme .verify-code-input {
-          background: var(--bg-dark);
-          color: var(--text-dark);
-        }
-
-        .verify-code-input:focus {
-          outline: none;
-          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.3);
-        }
-
-        .verify-code-buttons {
-          display: flex;
-          gap: 0.75rem;
-        }
-
-        .verify-submit-button,
-        .verify-cancel-button {
-          flex: 1;
-          padding: 0.75rem;
-          border: none;
-          border-radius: var(--radius-lg);
-          font-size: 0.9375rem;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.3s;
-        }
-
-        .verify-submit-button {
-          background: var(--success);
-          color: white;
-        }
-
-        .verify-submit-button:hover:not(:disabled) {
-          filter: brightness(1.1);
-          transform: translateY(-2px);
-          box-shadow: var(--shadow-md);
-        }
-
-        .verify-submit-button:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
-        .verify-cancel-button {
-          background: var(--bg-chat-light);
-          color: var(--text-light);
-        }
-
-        .dark-theme .verify-cancel-button {
-          background: var(--bg-dark);
-          color: var(--text-dark);
-        }
-
-        .verify-cancel-button:hover {
-          filter: brightness(0.95);
-        }
-
-        .verify-countdown {
-          text-align: center;
-          color: var(--text-secondary-light);
-          font-size: 0.875rem;
-        }
-
-        .verify-resend-link {
-          background: none;
-          border: none;
-          color: var(--primary);
-          font-size: 0.875rem;
-          text-decoration: underline;
-          cursor: pointer;
-          padding: 0.5rem;
-        }
-
-        .verify-resend-link:hover:not(:disabled) {
-          color: var(--primary-dark);
-        }
-
-        .verify-resend-link:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
+        .profile-textarea {
+          resize: vertical;
+          font-family: inherit;
         }
 
         .settings-section {
@@ -809,7 +780,7 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
           color: var(--text-light);
         }
 
-        .dark-theme .settings-section h3 {
+        .dark .settings-section h3 {
           color: var(--text-dark);
         }
 
@@ -827,7 +798,7 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
           background: var(--bg-chat-light);
         }
 
-        .dark-theme .setting-item:hover {
+        .dark .setting-item:hover {
           background: var(--bg-dark);
         }
 
@@ -835,6 +806,31 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
           width: 1.125rem;
           height: 1.125rem;
           cursor: pointer;
+        }
+
+        .empty-blocked {
+          text-align: center;
+          padding: 1rem;
+          color: var(--text-secondary-light);
+          background: var(--bg-chat-light);
+          border-radius: var(--radius-lg);
+        }
+
+        .dark .empty-blocked {
+          background: var(--bg-dark);
+          color: var(--text-secondary-dark);
+        }
+
+        .danger-zone {
+          margin-top: 2rem;
+          padding: 1rem;
+          border: 1px solid var(--danger);
+          border-radius: var(--radius-lg);
+        }
+
+        .danger-zone h3 {
+          color: var(--danger);
+          margin-bottom: 1rem;
         }
 
         .danger-button {
@@ -857,11 +853,35 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
           box-shadow: var(--shadow-md);
         }
 
+        .secondary-button {
+          width: 100%;
+          padding: 0.75rem;
+          margin-bottom: 0.5rem;
+          background: var(--bg-chat-light);
+          color: var(--text-light);
+          border: 1px solid var(--border-light);
+          border-radius: var(--radius-lg);
+          font-size: 0.875rem;
+          cursor: pointer;
+          transition: all 0.3s;
+        }
+
+        .dark .secondary-button {
+          background: var(--bg-dark);
+          color: var(--text-dark);
+          border-color: var(--border-dark);
+        }
+
+        .secondary-button:hover {
+          transform: translateY(-2px);
+          box-shadow: var(--shadow-md);
+        }
+
         .stats-grid {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
           gap: 1rem;
-          margin-bottom: 1rem;
+          margin-bottom: 2rem;
         }
 
         .stat-card {
@@ -872,7 +892,7 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
           transition: transform 0.3s;
         }
 
-        .dark-theme .stat-card {
+        .dark .stat-card {
           background: var(--bg-dark);
         }
 
@@ -893,22 +913,33 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
           font-size: 0.875rem;
         }
 
-        .dark-theme .stat-label {
+        .dark .stat-label {
           color: var(--text-secondary-dark);
         }
 
-        .last-active {
-          text-align: center;
-          color: var(--text-secondary-light);
-          font-size: 0.875rem;
-          padding: 1rem;
+        .stats-details {
           background: var(--bg-chat-light);
+          padding: 1rem;
           border-radius: var(--radius-lg);
         }
 
-        .dark-theme .last-active {
+        .dark .stats-details {
           background: var(--bg-dark);
-          color: var(--text-secondary-dark);
+        }
+
+        .stat-row {
+          display: flex;
+          justify-content: space-between;
+          padding: 0.5rem 0;
+          border-bottom: 1px solid var(--border-light);
+        }
+
+        .dark .stat-row {
+          border-bottom-color: var(--border-dark);
+        }
+
+        .stat-row:last-child {
+          border-bottom: none;
         }
 
         .profile-footer {
@@ -919,7 +950,7 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
           padding-top: 1.5rem;
         }
 
-        .dark-theme .profile-footer {
+        .dark .profile-footer {
           border-top-color: var(--border-dark);
         }
 
@@ -961,7 +992,7 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
           color: var(--text-light);
         }
 
-        .dark-theme .profile-button.cancel {
+        .dark .profile-button.cancel {
           background: var(--bg-dark);
           color: var(--text-dark);
         }
@@ -982,30 +1013,14 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
           cursor: not-allowed;
         }
 
-        @keyframes scaleIn {
-          from {
-            opacity: 0;
-            transform: scale(0.9);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-
         @media (max-width: 768px) {
           .profile-modal {
             padding: 1.5rem;
-            width: 95%;
           }
 
           .profile-avatar-container {
             width: 100px;
             height: 100px;
-          }
-
-          .profile-avatar {
-            font-size: 2.5rem;
           }
 
           .profile-name {
@@ -1024,9 +1039,14 @@ const Profile = ({ user, onClose, onUpdate, onLogout, onVerifyEmail }) => {
             font-size: 1.5rem;
           }
 
-          .verify-code-input {
-            font-size: 1.25rem;
-            letter-spacing: 0.25rem;
+          .info-item {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.25rem;
+          }
+
+          .info-label {
+            width: auto;
           }
         }
       `}</style>
