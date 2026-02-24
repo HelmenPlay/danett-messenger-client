@@ -1050,4 +1050,673 @@ function App() {
     );
   };
 
-  const emojis = ['😊', '😂', '❤️', '👍', '🎉', '
+  const emojis = ['😊', '😂', '❤️', '👍', '🎉', '🔥', '😢', '😡', '😎', '🤔', '👋', '✅'];
+  
+  const filteredUsers = Object.entries(onlineUsers)
+    .filter(([email]) => email !== currentUser?.email)
+    .filter(([email]) => {
+      const username = emailToUsername[email] || email;
+      return username.toLowerCase().includes(searchTerm.toLowerCase());
+    });
+
+  // ==================== РЕНДЕР АВТОРИЗАЦИИ ====================
+
+  if (!isAuthenticated) {
+    return (
+      <div className={`App auth-page ${darkTheme ? 'dark-theme' : ''}`}>
+        <div className="auth-container">
+          <div className="auth-card">
+            <h1 className="auth-logo">✨ Danett Messenger</h1>
+            
+            <div className="auth-tabs">
+              <button 
+                className={`auth-tab ${authMode === 'login' ? 'active' : ''}`}
+                onClick={() => setAuthMode('login')}
+              >
+                Вход
+              </button>
+              <button 
+                className={`auth-tab ${authMode === 'register' ? 'active' : ''}`}
+                onClick={() => setAuthMode('register')}
+              >
+                Регистрация
+              </button>
+            </div>
+
+            {showVerification ? (
+              <div className="auth-form">
+                <h3>Подтверждение email</h3>
+                <p>Код отправлен на <strong>{verificationEmail}</strong></p>
+                <input
+                  type="text"
+                  placeholder="Введите 6-значный код"
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="auth-input"
+                  maxLength="6"
+                  autoFocus
+                />
+                <div className="auth-buttons">
+                  <button onClick={() => setShowVerification(false)} className="auth-button secondary">
+                    Назад
+                  </button>
+                  <button onClick={() => verifyEmail()} className="auth-button primary" disabled={verificationCode.length !== 6}>
+                    Подтвердить
+                  </button>
+                </div>
+                <div className="auth-footer">
+                  {countdown > 0 ? (
+                    <span>Отправить повторно через {countdown}с</span>
+                  ) : (
+                    <button onClick={resendCode} className="auth-link">
+                      Отправить код повторно
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : authMode === 'login' ? (
+              <form onSubmit={handleLogin} className="auth-form">
+                <input
+                  type="text"
+                  placeholder="Email, телефон или имя"
+                  value={loginForm.login}
+                  onChange={(e) => setLoginForm({ ...loginForm, login: e.target.value })}
+                  className="auth-input"
+                  required
+                />
+                <input
+                  type="password"
+                  placeholder="Пароль"
+                  value={loginForm.password}
+                  onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                  className="auth-input"
+                  required
+                />
+                <button type="submit" className="auth-button primary" disabled={loading}>
+                  {loading ? 'Вход...' : 'Войти'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleRegister} className="auth-form">
+                <input
+                  type="text"
+                  placeholder="Имя пользователя"
+                  value={registerForm.username}
+                  onChange={(e) => setRegisterForm({ ...registerForm, username: e.target.value })}
+                  className="auth-input"
+                  required
+                />
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={registerForm.email}
+                  onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
+                  className="auth-input"
+                  required
+                />
+                <input
+                  type="tel"
+                  placeholder="Телефон"
+                  value={registerForm.phone}
+                  onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })}
+                  className="auth-input"
+                  required
+                />
+                <input
+                  type="password"
+                  placeholder="Пароль"
+                  value={registerForm.password}
+                  onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
+                  className="auth-input"
+                  required
+                />
+                <input
+                  type="password"
+                  placeholder="Подтвердите пароль"
+                  value={registerForm.confirmPassword}
+                  onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
+                  className="auth-input"
+                  required
+                />
+                <button type="submit" className="auth-button primary" disabled={loading}>
+                  {loading ? 'Регистрация...' : 'Зарегистрироваться'}
+                </button>
+              </form>
+            )}
+            
+            <button 
+              onClick={() => setDarkTheme(!darkTheme)} 
+              className="theme-toggle"
+              aria-label="Переключить тему"
+            >
+              {darkTheme ? '☀️' : '🌙'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ==================== РЕНДЕР ОСНОВНОГО ИНТЕРФЕЙСА ====================
+
+  return (
+    <div className={`App ${darkTheme ? 'dark-theme' : ''}`}>
+      {/* Уведомления */}
+      <div className="notifications-container">
+        {notifications.map(notif => (
+          <div key={notif.id} className="notification">
+            {notif.message}
+          </div>
+        ))}
+      </div>
+
+      {/* Шапка */}
+      <header className="app-header">
+        <div className="header-left">
+          <button className="menu-button" onClick={() => setSidebarOpen(!sidebarOpen)}>
+            ☰
+          </button>
+          <h1 className="app-logo">Danett</h1>
+        </div>
+        
+        <div className="header-center">
+          <span className="online-count">
+            {Object.values(onlineUsers).filter(s => s === 'online').length} онлайн
+          </span>
+        </div>
+        
+        <div className="header-right">
+          <button onClick={() => setSoundEnabled(!soundEnabled)} className="icon-button">
+            {soundEnabled ? '🔊' : '🔇'}
+          </button>
+          <button onClick={() => setDarkTheme(!darkTheme)} className="icon-button">
+            {darkTheme ? '☀️' : '🌙'}
+          </button>
+          <button onClick={() => setShowProfile(true)} className="profile-button">
+            <div className="avatar-small">
+              {currentUser?.username?.charAt(0).toUpperCase()}
+            </div>
+          </button>
+        </div>
+      </header>
+
+      {/* Модалка профиля */}
+      {showProfile && (
+        <Profile 
+          user={currentUser} 
+          onClose={() => setShowProfile(false)}
+          onUpdate={handleUpdateProfile}
+          onLogout={handleLogout}
+          onVerifyEmail={async (email, code) => {
+            if (!code) {
+              return await sendVerificationCode(email);
+            } else {
+              return await verifyEmail(email, code);
+            }
+          }}
+        />
+      )}
+
+      {/* Модалка подтверждения */}
+      {showVerification && (
+        <div className="modal-overlay" onClick={() => setShowVerification(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h3>Подтверждение email</h3>
+            <p>Код отправлен на <strong>{verificationEmail}</strong></p>
+            <input
+              type="text"
+              placeholder="Введите 6-значный код"
+              value={verificationCode}
+              onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              className="modal-input"
+              maxLength="6"
+              autoFocus
+            />
+            <div className="modal-buttons">
+              <button onClick={() => setShowVerification(false)} className="modal-button secondary">
+                Закрыть
+              </button>
+              <button onClick={verifyEmail} className="modal-button primary" disabled={verificationCode.length !== 6}>
+                Подтвердить
+              </button>
+            </div>
+            <div className="modal-footer">
+              {countdown > 0 ? (
+                <span>Отправить повторно через {countdown}с</span>
+              ) : (
+                <button onClick={resendCode} className="modal-link">
+                  Отправить код повторно
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модалка входящего звонка */}
+      {isCallIncoming && (
+        <div className="modal-overlay">
+          <div className="modal-content call-modal">
+            <div className="call-avatar">
+              {callerName?.charAt(0).toUpperCase()}
+            </div>
+            <h3>Входящий звонок</h3>
+            <p className="caller-name">{callerName}</p>
+            <div className="call-buttons">
+              <button onClick={acceptCall} className="call-button accept">
+                ✅ Ответить
+              </button>
+              <button onClick={rejectCall} className="call-button reject">
+                ❌ Отклонить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Интерфейс звонка */}
+      {isCallActive && (
+        <div className={`call-interface ${isCallMinimized ? 'minimized' : ''}`}>
+          {isCallMinimized ? (
+            <div className="minimized-call" onClick={() => setIsCallMinimized(false)}>
+              <video ref={remoteVideoRef} autoPlay playsInline className="minimized-video" />
+              <div className="minimized-info">
+                <span>{recipientUsername || callerName}</span>
+                <span className="call-duration">🎥</span>
+              </div>
+            </div>
+          ) : (
+            <div className="fullscreen-call">
+              <div className="call-header">
+                <span>Звонок с {recipientUsername || callerName}</span>
+                <button onClick={() => setIsCallMinimized(true)} className="minimize-button">
+                  ⚪
+                </button>
+              </div>
+              
+              <div className="videos-container">
+                <video 
+                  ref={remoteVideoRef} 
+                  autoPlay 
+                  playsInline 
+                  className="remote-video" 
+                />
+                <video 
+                  ref={localVideoRef} 
+                  autoPlay 
+                  playsInline 
+                  muted 
+                  className="local-video" 
+                />
+              </div>
+              
+              <div className="call-controls">
+                <button 
+                  onClick={toggleAudio} 
+                  className={`control-button ${isAudioMuted ? 'off' : ''}`}
+                >
+                  {isAudioMuted ? '🔇' : '🎤'}
+                </button>
+                <button 
+                  onClick={toggleVideo} 
+                  className={`control-button ${isVideoOff ? 'off' : ''}`}
+                >
+                  {isVideoOff ? '📹❌' : '📹'}
+                </button>
+                <button onClick={endCall} className="control-button end-call">
+                  📴
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Основной контейнер */}
+      <div className="main-container">
+        {/* Сайдбар */}
+        <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+          <div className="sidebar-header">
+            <div className="tabs">
+              <button 
+                className={`tab ${activeTab === 'chats' ? 'active' : ''}`}
+                onClick={() => { setActiveTab('chats'); setSidebarOpen(false); }}
+              >
+                💬 Чаты
+              </button>
+              <button 
+                className={`tab ${activeTab === 'groups' ? 'active' : ''}`}
+                onClick={() => { setActiveTab('groups'); setSidebarOpen(false); }}
+              >
+                👥 Группы
+              </button>
+            </div>
+            
+            {activeTab === 'chats' ? (
+              <>
+                <h3>Контакты</h3>
+                <input
+                  type="text"
+                  placeholder="Поиск..."
+                  className="search-input"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </>
+            ) : (
+              <>
+                <h3>Группы</h3>
+                <button onClick={() => setShowCreateGroup(true)} className="create-group-button">
+                  + Создать группу
+                </button>
+              </>
+            )}
+          </div>
+
+          <div className="users-list">
+            {activeTab === 'chats' ? (
+              filteredUsers.length > 0 ? (
+                filteredUsers.map(([email, status]) => {
+                  const displayName = emailToUsername[email] || email.split('@')[0];
+                  return (
+                    <div
+                      key={email}
+                      className={`user-item ${recipient === email ? 'selected' : ''}`}
+                      onClick={() => { 
+                        setRecipient(email); 
+                        setRecipientUsername(displayName); 
+                        setCurrentGroup(null);
+                        setSidebarOpen(false);
+                      }}
+                    >
+                      <div className="user-avatar">
+                        {displayName.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="user-info">
+                        <div className="user-name">
+                          {displayName}
+                          <span className={`status-dot ${status}`}></span>
+                        </div>
+                        <div className="last-message">
+                          {status === 'online' ? 'В сети' : 'Был недавно'}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="empty-list">
+                  {searchTerm ? 'Ничего не найдено' : 'Нет контактов'}
+                </div>
+              )
+            ) : (
+              groups.length > 0 ? (
+                groups.map(group => (
+                  <div
+                    key={group._id}
+                    className={`user-item ${currentGroup?._id === group._id ? 'selected' : ''}`}
+                    onClick={() => { 
+                      setCurrentGroup(group); 
+                      setRecipient('');
+                      setSidebarOpen(false);
+                    }}
+                  >
+                    <div className="user-avatar group-avatar">👥</div>
+                    <div className="user-info">
+                      <div className="user-name">{group.name}</div>
+                      <div className="last-message">
+                        {group.members?.length || 0} участников
+                      </div>
+                    </div>
+                    {group.admin === currentUser?.email && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteGroup(group._id, group.name); }}
+                        className="delete-button"
+                        title="Удалить группу"
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="empty-list">
+                  Нет групп. Создайте первую!
+                </div>
+              )
+            )}
+          </div>
+        </aside>
+
+        {/* Модалка создания группы */}
+        {showCreateGroup && (
+          <div className="modal-overlay" onClick={() => setShowCreateGroup(false)}>
+            <div className="modal-content" onClick={e => e.stopPropagation()}>
+              <h3>Создание группы</h3>
+              <input
+                type="text"
+                placeholder="Название группы"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                className="modal-input"
+                autoFocus
+              />
+              
+              <h4>Выберите участников:</h4>
+              <div className="members-list">
+                {Object.keys(onlineUsers).map(email => email !== currentUser?.email && (
+                  <label key={email} className="member-item">
+                    <input
+                      type="checkbox"
+                      checked={selectedMembers.includes(email)}
+                      onChange={() => toggleMember(email)}
+                    />
+                    <span className="member-name">{emailToUsername[email] || email}</span>
+                  </label>
+                ))}
+              </div>
+              
+              <div className="modal-buttons">
+                <button onClick={() => setShowCreateGroup(false)} className="modal-button secondary">
+                  Отмена
+                </button>
+                <button 
+                  onClick={createGroup} 
+                  className="modal-button primary"
+                  disabled={!newGroupName.trim() || selectedMembers.length === 0}
+                >
+                  Создать
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Область чата */}
+        <main className="chat-area">
+          {activeTab === 'chats' && recipient ? (
+            <>
+              <div className="chat-header">
+                <div className="chat-user-info">
+                  <div className="chat-user-avatar">
+                    {recipientUsername.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="chat-user-name">{recipientUsername}</div>
+                    <div className="chat-user-status">
+                      {onlineUsers[recipient] === 'online' ? '🟢 В сети' : '🔴 Офлайн'}
+                    </div>
+                  </div>
+                </div>
+                
+                {onlineUsers[recipient] === 'online' && !isCallActive && (
+                  <button onClick={startCall} className="call-button">
+                    📞 Позвонить
+                  </button>
+                )}
+              </div>
+
+              <div className="messages-container">
+                {messages.map((msg, index) => (
+                  <div key={index} className={`message ${msg.from === 'me' ? 'my-message' : ''}`}>
+                    <div className="message-content">
+                      {msg.from !== 'me' && (
+                        <div className="message-sender">
+                          {emailToUsername[msg.from] || msg.from}
+                        </div>
+                      )}
+                      <div className="message-text">{msg.text}</div>
+                      <div className="message-time">{msg.timestamp}</div>
+                    </div>
+                  </div>
+                ))}
+                
+                {typingStatus && (
+                  <div className="message typing-indicator">
+                    <div className="message-content">
+                      <em>{typingStatus}</em>
+                    </div>
+                  </div>
+                )}
+                
+                <div ref={messagesEndRef} />
+              </div>
+
+              <div className="message-input-area">
+                <div className="message-form">
+                  <button 
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
+                    className="emoji-button"
+                  >
+                    😊
+                  </button>
+                  
+                  {showEmojiPicker && (
+                    <div className="emoji-picker">
+                      {emojis.map(emoji => (
+                        <button key={emoji} onClick={() => addEmoji(emoji)} className="emoji-item">
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <input
+                    type="text"
+                    placeholder={onlineUsers[recipient] === 'online' 
+                      ? `Напишите сообщение...` 
+                      : `Сообщение придет, когда пользователь появится.`}
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyUp={handleTyping}
+                    onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                    disabled={!isConnected}
+                    className="message-input"
+                  />
+                  
+                  <button 
+                    onClick={sendMessage} 
+                    disabled={!isConnected || !recipient || !message.trim()}
+                    className="send-button"
+                  >
+                    ➤
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : activeTab === 'groups' && currentGroup ? (
+            <>
+              <div className="chat-header">
+                <div className="chat-user-info">
+                  <div className="chat-user-avatar group-avatar">👥</div>
+                  <div>
+                    <div className="chat-user-name">{currentGroup.name}</div>
+                    <div className="chat-user-status">
+                      {currentGroup.members?.length || 0} участников
+                    </div>
+                  </div>
+                </div>
+                
+                {currentGroup.admin === currentUser?.email && (
+                  <button 
+                    onClick={() => deleteGroup(currentGroup._id, currentGroup.name)} 
+                    className="delete-group-button"
+                  >
+                    🗑️ Удалить группу
+                  </button>
+                )}
+              </div>
+
+              <div className="messages-container">
+                {groupMessages.map((msg, index) => (
+                  <div key={index} className={`message ${msg.from === 'me' ? 'my-message' : ''}`}>
+                    <div className="message-content">
+                      {msg.from !== 'me' && (
+                        <div className="message-sender">
+                          {emailToUsername[msg.from] || msg.from}
+                        </div>
+                      )}
+                      <div className="message-text">{msg.text}</div>
+                      <div className="message-time">{msg.timestamp}</div>
+                    </div>
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+
+              <div className="message-input-area">
+                <div className="message-form">
+                  <button 
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
+                    className="emoji-button"
+                  >
+                    😊
+                  </button>
+                  
+                  {showEmojiPicker && (
+                    <div className="emoji-picker">
+                      {emojis.map(emoji => (
+                        <button key={emoji} onClick={() => addEmoji(emoji)} className="emoji-item">
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <input
+                    type="text"
+                    placeholder={`Напишите сообщение...`}
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && sendGroupMessage()}
+                    disabled={!isConnected}
+                    className="message-input"
+                  />
+                  
+                  <button 
+                    onClick={sendGroupMessage} 
+                    disabled={!isConnected || !currentGroup || !message.trim()}
+                    className="send-button"
+                  >
+                    ➤
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="placeholder">
+              {activeTab === 'chats' 
+                ? 'Выберите собеседника, чтобы начать общение 💬' 
+                : 'Выберите группу или создайте новую 👥'}
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* Затемнение для мобильного меню */}
+      {sidebarOpen && <div className="overlay" onClick={() => setSidebarOpen(false)} />}
+    </div>
+  );
+}
+
+export default App;
