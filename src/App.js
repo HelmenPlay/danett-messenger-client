@@ -1243,14 +1243,23 @@ function App() {
 
       {/* Модалка профиля */}
       {showProfile && (
-        <Profile 
-          user={currentUser} 
-          onClose={() => setShowProfile(false)}
-          onUpdate={handleUpdateProfile}
-          onLogout={handleLogout}
-        />
-      )}
-
+        {showProfile && (
+  <Profile 
+    user={currentUser} 
+    onClose={() => setShowProfile(false)}
+    onUpdate={handleUpdateProfile}
+    onLogout={handleLogout}
+    onVerifyEmail={async (email, code) => {
+      if (!code) {
+        // Отправка кода
+        await sendVerificationCode(email);
+      } else {
+        // Подтверждение кода
+        await verifyEmail(email, code);
+      }
+    }}
+  />
+)}
       {/* Модалка подтверждения */}
       {showVerification && (
         <div className="modal-overlay" onClick={() => setShowVerification(false)}>
